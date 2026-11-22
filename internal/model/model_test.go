@@ -303,3 +303,48 @@ func TestStellarAssetContractInterface(t *testing.T) {
 	require.Len(t, trust.Inputs, 1)
 	assert.Equal(t, "addr", trust.Inputs[0].Name)
 }
+
+// TestInterfaceFunctionEdgeCases covers boundary inputs that the happy-path
+// test does not exercise: an empty interface, a function with an empty-string
+// name, and a name that differs only by trailing whitespace.
+func TestInterfaceFunctionEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		iface  *model.Interface
+		lookup string
+		wantOk bool
+		wantFn string
+	}{
+		{
+			name:   "empty interface returns not-found for any lookup",
+			iface:  &model.Interface{},
+			lookup: "transfer",
+			wantOk: false,
+		},
+		{
+			name:   "empty-string name matches a function registered as empty string",
+			iface:  &model.Interface{Functions: []model.Function{{Name: ""}, {Name: "mint"}}},
+			lookup: "",
+			wantOk: true,
+			wantFn: "",
+		},
+		{
+			name:   "name with trailing space does not match the trimmed form",
+			iface:  &model.Interface{Functions: []model.Function{{Name: "transfer"}}},
+			lookup: "transfer ",
+			wantOk: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			fn, ok := tt.iface.Function(tt.lookup)
+			assert.Equal(t, tt.wantOk, ok)
+			if tt.wantOk {
+				assert.Equal(t, tt.wantFn, fn.Name)
+			}
+		})
+	}
+}

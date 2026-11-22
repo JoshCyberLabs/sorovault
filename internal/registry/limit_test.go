@@ -342,3 +342,33 @@ func TestMaxConcurrentOfOneSerialises(t *testing.T) {
 	<-done
 	assert.EqualValues(t, 1, network.peak.Load())
 }
+
+// TestAcquireTimeoutEdgeCases mirrors TestMaxConcurrentEdgeCases for the
+// AcquireTimeout option: an unset or non-positive value falls back to the
+// default, and any positive value is kept as given.
+func TestAcquireTimeoutEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		timeout time.Duration
+		want    time.Duration
+	}{
+		{name: "unset falls back to the default", timeout: 0, want: registry.DefaultAcquireTimeout},
+		{name: "negative falls back to the default", timeout: -time.Second, want: registry.DefaultAcquireTimeout},
+		{name: "most negative duration falls back to the default", timeout: time.Duration(math.MinInt), want: registry.DefaultAcquireTimeout},
+		{name: "one nanosecond is the smallest timeout kept", timeout: time.Nanosecond, want: time.Nanosecond},
+		{name: "a large timeout is kept", timeout: 10 * time.Minute, want: 10 * time.Minute},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			reg := registry.New(stellartest.New(), spec.XDRDecoder{}, store.NewMemory(), registry.Options{
+				Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+				AcquireTimeout: tt.timeout,
+			})
+			assert.Equal(t, tt.want, reg.AcquireTimeout())
+		})
+	}
+}
